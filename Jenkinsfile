@@ -1,95 +1,78 @@
 pipeline {
     agent any
-    tools { 
-        maven 'maven-3.8.6' 
-    }
-    stages {
-        stage('Checkout git') {
-            steps {
-               git branch: 'main', url: 'https://github.com/praveensirvi1212/DevSecOps-project'
-            }
-        }
-        
-        stage ('Build & JUnit Test') {
-            steps {
-                sh 'mvn install' 
-            }
-            post {
-               success {
-                    junit 'target/surefire-reports/**/*.xml'
-                }   
-            }
-        }
-        stage('SonarQube Analysis'){
-            steps{
-                withSonarQubeEnv('SonarQube-server') {
-                        sh 'mvn clean verify sonar:sonar \
-                        -Dsonar.projectKey=devsecops-project-key \
-                        -Dsonar.host.url=$sonarurl \
-                        -Dsonar.login=$sonarlogin'
-                }
-            }
-        }
-        stage("Quality Gate") {
-            steps {
-              timeout(time: 1, unit: 'HOURS') {
-                waitForQualityGate abortPipeline: true
-              }
-            }
-        }
-        
-        stage('Docker  Build') {
-            steps {
-      	        sh 'docker build -t praveensirvi/sprint-boot-app:v1.$BUILD_ID .'
-                sh 'docker image tag praveensirvi/sprint-boot-app:v1.$BUILD_ID praveensirvi/sprint-boot-app:latest'
-            }
-        }
-        stage('Image Scan') {
-            steps {
-      	        sh ' trivy image --format template --template "@/usr/local/share/trivy/templates/html.tpl" -o report.html praveensirvi/sprint-boot-app:latest '
-            }
-        }
-        stage('Upload Scan report to AWS S3') {
-              steps {
-                  sh 'aws s3 cp report.html s3://devsecops-project/'
-              }
-         }
-        stage('Docker  Push') {
-            steps {
-                withVault(configuration: [skipSslVerification: true, timeout: 60, vaultCredentialId: 'vault-cred', vaultUrl: 'http://your-vault-server-ip:8200'], vaultSecrets: [[path: 'secrets/creds/docker', secretValues: [[vaultKey: 'username'], [vaultKey: 'password']]]]) {
-                    sh "docker login -u ${username} -p ${password} "
-                    sh 'docker push praveensirvi/sprint-boot-app:v1.$BUILD_ID'
-                    sh 'docker push praveensirvi/sprint-boot-app:latest'
-                    sh 'docker rmi praveensirvi/sprint-boot-app:v1.$BUILD_ID praveensirvi/sprint-boot-app:latest'
-                }
-            }
-        }
-        stage('Deploy to k8s') {
-            steps {
-                script{
-                    kubernetesDeploy configs: 'spring-boot-deployment.yaml', kubeconfigId: 'kubernetes'
-                }
-            }
-        }
-        
- 
-    }
-    post{
-        always{
-            sendSlackNotifcation()
-            }
-        }
-}
 
-def sendSlackNotifcation()
-{
-    if ( currentBuild.currentResult == "SUCCESS" ) {
-        buildSummary = "Job_name: ${env.JOB_NAME}\n Build_id: ${env.BUILD_ID} \n Status: *SUCCESS*\n Build_url: ${BUILD_URL}\n Job_url: ${JOB_URL} \n"
-        slackSend( channel: "#devops", token: 'slack-token', color: 'good', message: "${buildSummary}")
-    }
-    else {
-        buildSummary = "Job_name: ${env.JOB_NAME}\n Build_id: ${env.BUILD_ID} \n Status: *FAILURE*\n Build_url: ${BUILD_URL}\n Job_url: ${JOB_URL}\n  \n "
-        slackSend( channel: "#devops", token: 'slack-token', color : "danger", message: "${buildSummary}")
+    stages {
+        stage('REPO-Checkout') {
+            steps {
+                script {
+                 checkout scmGit(branches: [[name: params.BRANCH]], extensions: [], userRemoteConfigs: [[credentialsId: 'Thaya', url: params.REPO_URL]])
+               }
+            }
+        }
+        stage('Maven build') {
+            tools {
+                jdk 'java-17'
+            }
+            steps {
+                sh 'mvn package'
+            }
+        }
+         stage('SAST-analysis') {
+            tools {
+                jdk 'java-17'
+            }
+            environment {
+                scannerHome = tool 'SonarQubeScanner'
+                projectName = "cdro-maven"
+            }
+            steps {
+                withSonarQubeEnv('sonar_1') {
+                    sh """
+                        export JAVA_HOME=\$JAVA_HOME
+                        export PATH=\$JAVA_HOME/bin:\$PATH
+                        ${scannerHome}/bin/sonar-scanner \
+                        -Dsonar.projectKey=${projectName} \
+                        -Dsonar.sources=src \
+                        -Dsonar.java.binaries=.
+                    """
+                }
+            }
+        }
+        stage('publish in nexus') {
+            steps {
+                nexusArtifactUploader artifacts: [[artifactId: 'cdro-maven', classifier: '', file: '/var/lib/jenkins/workspace/Intenship/Thaya/CDRO-Maven/target/demo-0.0.1-SNAPSHOT.jar', type: 'jar']], credentialsId: 'nexus31', groupId: 'com.logicfocus', nexusUrl: '192.168.1.163:32007', nexusVersion: 'nexus3', protocol: 'http', repository: 'cdro-maven', version: '1.0.1'
+            }
+            
+        }
+        stage('Download artifactory') {
+            steps {
+                archiveArtifacts artifacts: 'target/demo-0.0.1-SNAPSHOT.jar', followSymlinks: false
+            }    
+        }
+         stage('Generate builddata.json') {
+            steps {
+                script {
+                    def currentPath = pwd()
+                    def path = currentPath.split("/")
+                    def folderName = path[-3]
+                    def repoName = sh(script: 'basename `git config --get remote.origin.url` .git', returnStdout: true).trim()
+                    def buildData = [
+                        BuildNumber: env.BUILD_NUMBER,
+                        jobName: env.JOB_NAME,
+                        jobUrl: env.BUILD_URL,
+                        "Repo-name" : "${repoName}",
+                        gitCommit: sh(script: 'git rev-parse HEAD', returnStdout: true).trim(),
+                        "Folder" : "${folderName}",
+                        ]
+                    writeFile file: 'BuildData.json' , text: groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(buildData))
+                }
+            }
+        }
+        stage('BuildData artifactory') {
+            steps{
+                archiveArtifacts artifacts: 'BuildData.json', followSymlinks: false
+            }
+        }
     }
 }
 
