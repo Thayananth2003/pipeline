@@ -40,7 +40,7 @@ pipeline {
         }
         stage('publish in nexus') {
             steps {
-                nexusArtifactUploader artifacts: [[artifactId: 'cdro-maven', classifier: '', file: '/var/lib/jenkins/workspace/Intenship/Thaya/CDRO-Maven/target/demo-0.0.1-SNAPSHOT.jar', type: 'jar']], credentialsId: 'nexus31', groupId: 'com.logicfocus', nexusUrl: '192.168.1.163:32007', nexusVersion: 'nexus3', protocol: 'http', repository: 'cdro-maven', version: '1.0.1'
+                nexusArtifactUploader artifacts: [[artifactId: 'CDRO-Maven', classifier: '', file: '/var/lib/jenkins/workspace/Intenship/Thaya/CDRO-Maven/target/demo-0.0.1-SNAPSHOT.jar', type: 'jar']], credentialsId: 'nexus31', groupId: 'com.logicfocus', nexusUrl: '192.168.1.163:32007', nexusVersion: 'nexus3', protocol: 'http', repository: 'CDRO-Maven', version: '1.0.1'
             }
             
         }
