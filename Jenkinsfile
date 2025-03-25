@@ -68,7 +68,7 @@ pipeline {
                 }
             }
         }
-        stage('BuildData artifactory') {
+        stage('Build-Data artifactory') {
             steps{
                 archiveArtifacts artifacts: 'BuildData.json', followSymlinks: false
             }
