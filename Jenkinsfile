@@ -73,6 +73,11 @@ pipeline {
                 archiveArtifacts artifacts: 'BuildData.json', followSymlinks: false
             }
         }
+        stage('Trigger CDRO') {
+            steps{
+                cloudBeesFlowRunPipeline addParam: '{"pipeline":{"pipelineName":"CDRO-Maven","parameters":[]}}', configuration: '/project/Default/pluginConfiguration/jenkins', pipelineName: 'CDRO-Maven', projectName: 'Naveen', stageOption: 'runAllStages', stagesToRun: '{"pipeline":{"pipelineName":"CDRO-Maven","stages":[{"stageName":"Build Report","stageValue":""},{"stageName":"Application Process","stageValue":""},{"stageName":"REPORT","stageValue":""},{"stageName":"SIT","stageValue":""},{"stageName":"UAT","stageValue":""}]}}', startingStage: ''
+            }
+        }    
     }
 }
 
