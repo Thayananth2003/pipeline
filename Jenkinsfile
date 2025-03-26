@@ -77,7 +77,34 @@ pipeline {
             steps{
                 cloudBeesFlowRunPipeline addParam: '{"pipeline":{"pipelineName":"CDRO-Maven","parameters":[]}}', configuration: '/project/Default/pluginConfiguration/jenkins', pipelineName: 'CDRO-Maven', projectName: 'Naveen', stageOption: 'runAllStages', stagesToRun: '{"pipeline":{"pipelineName":"CDRO-Maven","stages":[{"stageName":"Build Report","stageValue":""},{"stageName":"Application Process","stageValue":""},{"stageName":"REPORT","stageValue":""},{"stageName":"SIT","stageValue":""},{"stageName":"UAT","stageValue":""}]}}', startingStage: ''
             }
-        }    
+        }
+        stage('SAST Report') {
+            environment {
+                Project_key = "cdro-maven"
+                Sonar_URL = "http://192.168.1.163:32003"
+            }
+            steps {
+                script {
+                    withCredentials([string(credentialsId: 'sonar_1', variable: 'SONAR_TOKEN')]) {
+                        try {
+                            def sonarReport = sh(script: """
+                                curl -s -u ${SONAR_TOKEN}: '${Sonar_URL}/api/issues/search?componentKeys=${Project_Key}&types=BUG,VULNERABILITY,CODE_SMELL&ps=500' | jq -r '[.issues[] | {severity}] | group_by(.severity) | map({(.[0].severity): length}) | add'
+                            """, returnStdout: true).trim()
+                            writeFile file: 'SAST_Report.json', text: sonarReport
+
+                        }
+                        catch (Exception e) {
+                            error "Failed to retrieve SonarQube report: ${e.message}"
+                        }
+                    }
+                }
+            }
+        }
+        stage('Upload SAST Report') {
+            steps {
+                archiveArtifacts artifacts: 'SAST_Report.json', followSymlinks: false
+            }
+        }
     }
 }
 
