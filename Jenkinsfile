@@ -105,6 +105,12 @@ pipeline {
                 archiveArtifacts artifacts: 'SAST_Report.json', followSymlinks: false
             }
         }
+        stage('CDRO Report') {
+            steps {
+                cloudBeesFlowDeployApplication applicationName: 'CDRO-Maven', applicationProcessName: 'MAVEN APPLICATION', configuration: '/project/Default/pluginConfiguration/jenkins', deployParameters: '{"runProcess":{"applicationName":"CDRO-Maven","applicationProcessName":"MAVEN APPLICATION","parameter":[]}}', environmentName: 'MAVEN ENVIRONMENT', environmentProjectName: 'Naveen', projectName: 'Naveen'
+                
+            }
+        }
     }
 }
 
