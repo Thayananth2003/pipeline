@@ -104,13 +104,94 @@ pipeline {
                 archiveArtifacts artifacts: 'SAST_Report.json', followSymlinks: false
             }
         }
-        stage('CDRO Report') {
-            steps {
-                cloudBeesFlowDeployApplication applicationName: 'CDRO-Maven', applicationProcessName: 'MAVEN APPLICATION', configuration: '/project/Default/pluginConfiguration/jenkins', deployParameters: '{"runProcess":{"applicationName":"CDRO-Maven","applicationProcessName":"MAVEN APPLICATION","parameter":[]}}', environmentName: 'MAVEN ENVIRONMENT', environmentProjectName: 'Naveen', projectName: 'Naveen'
-                
+        
+    }
+    post {
+            always {
+                script {
+                    def emailBody = """
+                    <html>
+                    <body>
+                    <h2>Commit Details:</h2>
+                    <table border="1" cellspacing="0" cellpadding="5">
+                        <tr>
+                            <td><b>REPOSITORY NAME</b></td>
+                            <td>${env.REPO_NAME}</td>
+                        </tr>
+                        <tr>
+                            <td><b>REPOSITORY URL</b></td>
+                            <td>${env.REPO_URL}</td>
+                        </tr>
+                        <tr>
+                            <td><b>COMMIT ID</b></td>
+                            <td>${env.COMMIT_ID}</td>
+                        </tr>
+                        <tr>
+                            <td><b>VERSION NUMBER</b></td>
+                            <td>1.0.1</td>
+                        </tr>
+                        <tr>
+                            <td><b>LAST COMMIT DATE</b></td>
+                            <td>${env.LAST_COMMIT_DATE}</td>
+                        </tr>
+                        <tr>
+                            <td><b>BRANCH NAME</b></td>
+                            <td>release/r1.0</td>
+                        </tr>
+                    </table>
+                    <br>
+                    <h2>SonarQube Quality Gate:</h2>
+                    <table border="1" cellspacing="0" cellpadding="5">
+                        <tr>
+                            <th colspan="3" style="background-color: #FFFFCC; text-align: left;">Quality Gate</th>
+                        </tr>
+                        <tr>
+                            <td colspan="3" style="background-color: ${env.SONAR_QUALITY_GATE_STATUS == '0' ? 'green' : 'red'}; color: white; text-align: center;">
+                                ${env.SONAR_QUALITY_GATE_STATUS == '0' ? 'Quality Gate Passed' : 'Quality Gate Failed'}
+                            </td>
+                        </tr>
+                        <tr style="background-color: #BCE8F1;">
+                            <th>COMPONENT</th>
+                            <th>EXPECTED</th>
+                            <th>ACTUAL</th>
+                        </tr>
+                        <tr>
+                            <td>BLOCKER</td>
+                            <td>0</td>
+                            <td>${env.BLOCKER_COUNT}</td>
+                        </tr>
+                        <tr>
+                            <td>CRITICAL</td>
+                            <td>0</td>
+                            <td>${env.CRITICAL_COUNT}</td>
+                        </tr>
+                        <tr>
+                            <td>MAJOR</td>
+                            <td>0</td>
+                            <td>${env.MAJOR_COUNT}</td>
+                        </tr>
+                        <tr>
+                            <td>MINOR</td>
+                            <td>0</td>
+                            <td>${env.MINOR_COUNT}</td>
+                        </tr>
+                        <tr>
+                            <td>INFO</td>
+                            <td>0</td>
+                            <td>0</td>
+                        </tr>
+                    </table>
+                    <p>CI Run has been completed successfully.</p>
+                    """
+                    emailext(
+                        subject: "Build Notification/${env.REPO_NAME}",
+                        body: emailBody,
+                        to: 'vtthayananth@gmail.com',
+                        mimeType: 'text/html'
+                    )
+                }
             }
         }
-    }
 }
 
     
