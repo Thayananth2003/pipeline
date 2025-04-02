@@ -186,7 +186,7 @@ pipeline {
                     emailext(
                         subject: "Build Notification/${env.REPO_NAME}",
                         body: emailBody,
-                        to: 'vtthayananth@gmail.com',
+                        to: 'naveen.s@logicfocus.net',
                         mimeType: 'text/html'
                     )
                 }
